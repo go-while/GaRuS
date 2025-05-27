@@ -10,9 +10,20 @@
 
 # Test binary, built with `go test -c`
 *.test
+test/uploads/*
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+# private files
+bak/*
+.passwd*
+vendor/*
+pkg/*
+mod/*
+*.bak
+*.out
+*.swp
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
