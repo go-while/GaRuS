@@ -57,13 +57,17 @@ curl -F "file=@./artifact.zip" \
      -H "X-Git-Repo: owner/repo" \
      -H "X-Git-Ref: <branch-or-tag>" \
      -H "X-Git-SHA7: <commitsha>" \
+     -H "X-Git-Comp: <compiler-info>" \
      -H "X-Auth-Token: <yourtoken>" \
      http://localhost:58080/upload.php
 ```
 
+**Headers:**
+
 - `X-Git-Repo`   : Repository name (e.g., `owner/repo`)
 - `X-Git-Ref`    : Branch or tag name
 - `X-Git-SHA7`   : Short commit hash (7 chars)
+- `X-Git-Comp`   : Compiler/run info (optional, e.g., `SHR=self-hosted runner`, `GOR=GoReleaser`)
 - `X-Auth-Token` : Token for authentication (see below)
 
 ### 3. Token & Network Control
@@ -146,6 +150,7 @@ MIT. See `LICENSE`.
          -H "X-Git-Repo: $GITHUB_REPOSITORY" \
          -H "X-Git-Ref: $GITHUB_REF_NAME" \
          -H "X-Git-SHA7: ${GITHUB_SHA:0:7}" \
+         -H "X-Git-Comp: SHR=self-hosted runner" \
          -H "X-Auth-Token: ${{ secrets.GARUS_TOKEN }}" \
          https://your-garus-server/upload.php
 ```
