@@ -93,21 +93,38 @@ Tokens are reloaded automatically each minute. Expired tokens are pruned in memo
 
 ---
 
-## Directory Structure
+### File Storage Layout
+
+Uploaded files are stored on the server in a structured directory tree based on their associated repository, Git reference, commit, and compiler information. The storage path for each upload is constructed as follows:
 
 ```
-.
-├── main.go         # CLI entrypoint, admin interface, multi-instance logic
-├── networkacl/     # IP/network ACL parsing and checks
-│   └── netacl.go
-├── server/         # HTTP(S) server, upload handler
-│   └── server.go
-├── tokens/         # Token file handling, authentication
-│   └── tokens.go
-└── .passwd         # Example tokens file (see above)
+<upload-dir>/<repo>/<gitref>/<gitsha7>/<compiler>/<filename>
 ```
+
+- `<upload-dir>`: The base upload directory specified by the `-upload` flag (e.g., `/tmp/test/garus/uploads`)
+- `<repo>`: The repository name from the `X-Git-Repo` header
+- `<gitref>`: The branch or tag name from the `X-Git-Ref` header
+- `<gitsha7>`: The short 7-character commit hash from the `X-Git-SHA7` header
+- `<compiler>`: Optional compiler or runner info from the `X-Git-Comp` header (e.g., `SHR=self-hosted runner`, `GOR=GoReleaser`)
+- `<filename>`: The base name of the uploaded file
+
+**Example:**
+If the following headers are set:
+- `X-Git-Repo: go-while/GaRuS`
+- `X-Git-Ref: main`
+- `X-Git-SHA7: 1a2b3c4`
+- `X-Git-Comp: SHR=self-hosted`
+- and the uploaded file is `artifact.zip`
+
+The file will be stored at:
+```
+/tmp/test/garus/uploads/go-while/GaRuS/main/1a2b3c4/SHR=self-hosted/artifact.zip
+```
+
+This structure makes it easy to organize, locate, and manage artifacts by repository, branch, commit, and CI environment.
 
 ---
+
 
 ## Security
 
@@ -153,6 +170,22 @@ MIT. See `LICENSE`.
          -H "X-Git-Comp: SHR=self-hosted runner" \
          -H "X-Auth-Token: ${{ secrets.GARUS_TOKEN }}" \
          https://your-garus-server/upload.php
+```
+
+---
+
+## Directory Structure
+
+```
+.
+├── main.go         # CLI entrypoint, admin interface, multi-instance logic
+├── networkacl/     # IP/network ACL parsing and checks
+│   └── netacl.go
+├── server/         # HTTP(S) server, upload handler
+│   └── server.go
+├── tokens/         # Token file handling, authentication
+│   └── tokens.go
+└── .passwd         # Example tokens file (see above)
 ```
 
 ---
