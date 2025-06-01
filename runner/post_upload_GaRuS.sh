@@ -37,9 +37,12 @@ upload_with_retry() {
   return 1
 }
 
-for file in dist/*.zip dist/*.exe dist/*.deb dist/*.tgz dist/*.tar.gz dist/*.xz; do
+ls -lha .
+ls -lha dist/
+for file in dist/*.zip dist/*.exe dist/*.deb dist/*.tgz dist/*.tar.gz dist/*.xz dist/checksums.*; do
   [ -e "$file" ] || continue
   for algo in 256 512; do
+    [ "$file" = "dist/checksums.txt" ] && continue
     sha="sha${algo}sum"
     $sha "$file" > "$file.$sha"
     echo -e "\n$file.$sha"
@@ -49,11 +52,17 @@ for file in dist/*.zip dist/*.exe dist/*.deb dist/*.tgz dist/*.tar.gz dist/*.xz;
   upload_with_retry "$file"
 done
 
-#DIST="dist.tgz"
-#if [ -e "$DIST" ]; then
-#  echo "$DIST already exists. Skipping tar."
-#else
-#  tar -czf "$DIST" dist/
-#  echo "Created $DIST from dist/."
-#fi
+DIST="dist.${GITHUB_REF_NAME}-${GITHUB_SHA7}.$(hostname).tgz"
+if [ -e "$DIST" ]; then
+  echo "$DIST already exists. Skipping tar."
+else
+  tar -czf "$DIST" dist/
+  echo "Created $DIST from dist/."
+  du -b "$DIST"; du -hs "$DIST";
+  sha256sum "$DIST" > "${DIST}.sha256sum"
+  sha512sum "$DIST" > "${DIST}.sha512sum"
+  upload_with_retry "${DIST}.sha512sum"
+  upload_with_retry "${DIST}.sha256sum"
+  upload_with_retry "${DIST}"
+fi
 
