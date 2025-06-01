@@ -21,6 +21,9 @@ import (
 )
 
 var (
+	appVersion = "-" // will be set by compiler
+	commit = "-" // will be set by compiler
+	date = "-" // will be set by compiler
 	Servers  map[int]*garus.GaRuS
 	mainMux  sync.RWMutex
 	stopChan chan struct{}
@@ -31,6 +34,10 @@ var (
 )
 
 func main() {
+	if appVersion != "-" {
+		appVersion = appVersion+"|"+commit+"|"+date
+		garus.ModulesGVersion = appVersion
+	}
 	var adminIF, netacl, listen, routes, tokenf, upload, tlscrt, tlskey string
 	var addNew bool
 	//flag.BoolVar(&addNew, "add", false, "set flag -add=true to launch another garus server with own flags") // TODO!

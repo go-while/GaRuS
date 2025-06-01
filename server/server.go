@@ -21,7 +21,7 @@ import (
 	"github.com/go-while/GaRuS/tokens"
 )
 
-var modulesGVersion = "-" // will be set by git on compile time
+var ModulesGVersion = "-" // will be set by git on compile time
 const DefaultMemoryLimit = 10 * 1024 * 1024
 const DefaultBufferSize = 10 * 1024 * 1024
 const DefaultTLSkey = "privkey.pem"
@@ -234,11 +234,11 @@ func NewGaRuS(listenStr, routesStr, uploadStr, tokensStr, tlscrt, tlskey string,
 	instances := len(g.upServers)
 	g.mux.Unlock()
 
-	if modulesGVersion == "-" {
-		modulesGVersion = fmt.Sprintf("noBuildVersion! ::: test-run: started=%d :::\n", time.Now().Unix())
+	if ModulesGVersion == "-" {
+		ModulesGVersion = fmt.Sprintf("noBuildVersion! ::: test-run: started=%d :::\n", time.Now().Unix())
 	}
 
-	fmt.Printf("Starting GaRuS Version: [%s] | TLS=%t @ '%s' tokf='%s' route='%s' uploadDir='%s' | Instances=%d\n", modulesGVersion, newSrv.TLS, newSrv.Listen, newSrv.TokenF, newSrv.Routes, newSrv.Upload, instances)
+	fmt.Printf("Starting GaRuS Version: [%s] | TLS=%t @ '%s' tokf='%s' route='%s' uploadDir='%s' | Instances=%d\n", ModulesGVersion, newSrv.TLS, newSrv.Listen, newSrv.TokenF, newSrv.Routes, newSrv.Upload, instances)
 
 	go func(mux http.Handler, thisUpServer *UpServer) {
 		defer thisUpServer.stopwg.Done()
