@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 	"github.com/go-while/GaRuS/networkacl"
@@ -320,8 +321,12 @@ func uploadHandler(updir string, ts *tokens.TokenStore) http.HandlerFunc {
 		}
 		defer data.Close()
 
+		ext := filepath.Ext(handler.Filename)
+		if len(ext) > 1 && strings.HasPrefix(ext, ".") {
+			ext = ext[1:]
+		}
 		filename := filepath.Base(handler.Filename)
-		dstDir := filepath.Join(updir, repo, gitref, gitsha7, compiler)
+		dstDir := filepath.Join(updir, repo, gitref, gitsha7, ext, compiler)
 		dstFile := filepath.Join(dstDir, filename)
 
 		if FileExists(dstFile) {
