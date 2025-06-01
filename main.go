@@ -136,7 +136,7 @@ forever:
 			fmt.Print("main: received os.Signal\n")
 			break forever
 		case <-ticker.C:
-			fmt.Printf("GaRuS '%s' Alive!\n")
+			fmt.Printf("GaRuS '%s' Alive!\n", appVersion)
 		}
 	} // infinite wait
 	fmt.Printf("main: waiting for all servers to close...\n")
