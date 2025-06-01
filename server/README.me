@@ -1,0 +1,155 @@
+# GaRuS as an Importable Go Module
+
+GaRuS can be used not only as a standalone server but also as an importable Go module, making it easy to embed secure, token-authenticated upload endpoints into your own Go applications or services.
+
+---
+
+## Overview
+
+The `garus` package provides:
+
+- An easy-to-use API for starting one or more HTTP(S) upload servers.
+- Token-based authentication and network ACLs for upload endpoints.
+- Graceful shutdown and signal handling.
+- Configurable upload paths, routes, and token file locations.
+- Optional TLS support.
+
+---
+
+## Quickstart
+
+### Installation
+
+```sh
+go get github.com/go-while/GaRuS
+```
+
+### Minimal Example
+
+```go
+package main
+
+import (
+    "sync"
+    "github.com/go-while/GaRuS/server"
+)
+
+func main() {
+    var wg sync.WaitGroup
+    stopChan := make(chan struct{}, 1)
+
+    wg.Add(1)
+    _, err := garus.NewGaRuS(
+        garus.ListenDef,     // listen address, e.g. "[::]:58080"
+        garus.RoutesDef,     // endpoint, e.g. "/upload.php"
+        garus.UploadDef,     // upload directory, e.g. "/tmp/garus/uploads"
+        garus.TokensDef,     // token file path, e.g. "./.passwd"
+        "", "",              // TLS cert/key (empty for HTTP)
+        &wg,
+        stopChan,
+        nil,                 // existing GaRuS instance (nil for first)
+    )
+    if err != nil {
+        panic(err)
+    }
+    wg.Wait()
+}
+```
+
+---
+
+## Core Types
+
+- **`GaRuS`**: Main struct for holding all running servers and token state.
+- **`UpServer`**: Represents a single HTTP/TLS server instance.
+- **`NewGaRuS(...)`**: Factory function to launch a new upload server.
+- **`Server` interface**: For custom server management (`Start()`, `Stop(ctx)`).
+
+---
+
+## Server Startup
+
+**Recommended usage:**
+
+1. Configure upload directory and tokens file.
+2. Prepare a `sync.WaitGroup` and a `stopChan` (for graceful shutdown).
+3. Call `NewGaRuS(...)` for each upload endpoint you want to launch.
+
+**Example for launching multiple instances:**
+
+```go
+g, _ := garus.NewGaRuS("[::]:58080", "/upload1.php", "/tmp/up1", "./tokens1", "", "", &wg, stopChan, nil)
+garus.NewGaRuS("127.0.0.1:12345", "/upload2.php", "/tmp/up2", "./tokens2", "", "", &wg, stopChan, g)
+```
+
+---
+
+## Token/ACL System
+
+- Tokens are loaded from a file (default: `./.passwd`), format:
+  ```
+  repo|token|expires|acl
+  ```
+  - `repo`: project name
+  - `token`: auth secret (min 20 chars)
+  - `expires`: unix timestamp
+  - `acl`: comma-separated IPs/subnets (use `0.0.0.0` for global)
+
+- Tokens are auto-reloaded every minute.
+
+- Upload requests must include:
+  - `X-Git-Repo`, `X-Git-Ref`, `X-Git-SHA7`, `X-Auth-Token` headers
+  - File as form field `file`
+
+---
+
+## Customization
+
+- Change timeouts globally (before calling `NewGaRuS`):
+
+  ```go
+  garus.HttpIdleTimeout = 15
+  garus.HttpReadTimeout = 120
+  garus.HttpSendTimeout = 120
+  ```
+
+- Use your own `http.ServeMux` or handlers by modifying or wrapping the code in `server.go`.
+
+---
+
+## Example Upload Request
+
+```sh
+curl -F "file=@./myfile.zip" \
+     -H "X-Git-Repo: my/repo" \
+     -H "X-Git-Ref: main" \
+     -H "X-Git-SHA7: abc1234" \
+     -H "X-Auth-Token: <TOKEN>" \
+     http://localhost:58080/upload.php
+```
+
+---
+
+## Notes
+
+- Each `GaRuS` struct can manage multiple servers (multi-listen).
+- For TLS, provide `tlscrt` and `tlskey` file paths to `NewGaRuS`.
+- The upload handler will automatically create missing directories.
+
+---
+
+## Extending
+
+- See the `networkacl` and `tokens` submodules for standalone usage of ACL and token logic.
+
+---
+
+## License
+
+MIT
+
+---
+
+## See Also
+
+- [Standalone Server README](./README.md) for general usage and CLI instructions.
