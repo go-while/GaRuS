@@ -5,8 +5,13 @@
 ---
 
 - **Note:** GaRuS is also available as an importable Go module for embedding secure upload endpoints in your own applications.
-
 - See [server/README.md](server/README.md) for usage details.
+
+- **Note:** GaRuS includes a thread-safe, importable token storage module with per-repo, network-restricted, and auto-expiring tokens
+- See [tokens/README.md](tokens/README.md) for details.
+
+- **Note:** GaRuS includes a simple, thread-safe network ACL module for IP and subnet-based access control
+- See [networkacl/README.md](networkacl/README.md) for details.
 
 ---
 
