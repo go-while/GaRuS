@@ -5,13 +5,22 @@
 ---
 
 - **Note:** GaRuS is also available as an importable Go module for embedding secure upload endpoints in your own applications.
-- See [server/README.md](server/README.md) for usage details.
+> See [server/README.md](server/README.md) for usage details.
+
+---
 
 - **Note:** GaRuS includes a thread-safe, importable token storage module with per-repo, network-restricted, and auto-expiring tokens
-- See [tokens/README.md](tokens/README.md) for details.
+> See [tokens/README.md](tokens/README.md) for details.
+
+---
 
 - **Note:** GaRuS includes a simple, thread-safe network ACL module for IP and subnet-based access control
-- See [networkacl/README.md](networkacl/README.md) for details.
+> See [networkacl/README.md](networkacl/README.md) for details.
+
+---
+
+- **Note:** Runner Scripts
+> The directory [runner/](runner/) contains some scripts required to install self-hosted runners.
 
 ---
 
@@ -113,12 +122,12 @@ If the following headers are set:
 - `X-Git-Repo: go-while/GaRuS`
 - `X-Git-Ref: main`
 - `X-Git-SHA7: 1a2b3c4`
-- `X-Git-Comp: SHR=self-hosted`
+- `X-Git-Comp: SHR`
 - and the uploaded file is `artifact.zip`
 
 The file will be stored at:
 ```
-/tmp/test/garus/uploads/go-while/GaRuS/main/1a2b3c4/SHR=self-hosted/artifact.zip
+/tmp/test/garus/uploads/go-while/GaRuS/main/1a2b3c4/SHR/artifact.zip
 ```
 
 This structure makes it easy to organize, locate, and manage artifacts by repository, branch, commit, and CI environment.
