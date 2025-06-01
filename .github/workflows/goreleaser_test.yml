@@ -3,8 +3,8 @@ name: "Self-Hosted GoReleaser"
 on:
   push:
     branches:
-      - 'testrelease'
-      - 'dev'
+      - 'test-rel*'
+      - 'dev-test*'
     tags:
       - "test*"
   release:
@@ -14,7 +14,7 @@ on:
   pull_request:
     branches:
       #- main
-      - "test*"
+      - "pull-test*"
 
 permissions:
   contents: write
