@@ -146,6 +146,7 @@ This structure makes it easy to organize, locate, and manage artifacts by reposi
 
 ## TODO / Roadmap
 
+- [ ] Cache Module
 - [ ] Complete Admin Interface for runtime management of instances and tokens
 - [ ] REST endpoints for adding/removing tokens live
 - [ ] Logging improvements
