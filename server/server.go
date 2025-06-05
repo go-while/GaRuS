@@ -291,7 +291,7 @@ func uploadHandler(updir string, ts *tokens.TokenStore) http.HandlerFunc {
 		if len(compiler) == 0 {
 			compiler = "undef"
 		}
-		if repo == "" || len(gitsha7) != 7 || token == "" || len(token) < tokens.MinTokenLen || gitref == "" || len(gitref) <= 6 || len(gitref) > 64 {
+		if repo == "" || len(gitsha7) != 7 || token == "" || len(token) < tokens.MinTokenLen || gitref == "" || len(gitref) == 0 || len(gitref) > 64 {
 			fmt.Printf("Missing fields! repo='%s' token=%d gitref='%s' gitsha7='%s' compiler='%s' host='%s'\n", repo, len(token), gitref, gitsha7, compiler, host)
 			http.Error(w, "d", http.StatusUnauthorized)
 			return
