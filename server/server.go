@@ -18,13 +18,14 @@ import (
 	"strings"
 	"sync"
 	"time"
+
 	"github.com/go-while/GaRuS/networkacl"
 	"github.com/go-while/GaRuS/tokens"
 )
 
 var ModulesGVersion = "-" // will be set by git on compile time
-const DefaultMemoryLimit = 10 * 1024 * 1024
-const DefaultBufferSize = 10 * 1024 * 1024
+const DefaultMemoryLimit = 1 * 1024 * 1024
+const DefaultBufferSize = 256 * 1024
 const DefaultTLSkey = "privkey.pem"
 const DefaultTLScrt = "fullchain.pem"
 
@@ -33,7 +34,7 @@ const RoutesDef = "/upload.php"
 const TokensDef = "./.passwd"
 const UploadDef = "/tmp/test/garus/uploads"
 
-const DefaultHttpIdleTimeout = 5 // seconds (close idle conns after N seconds)
+const DefaultHttpIdleTimeout = 5  // seconds (close idle conns after N seconds)
 const DefaultHttpReadTimeout = 60 // seconds (affects max upload time to server)
 const DefaultHttpSendTimeout = 60 // seconds (affects max download time from server)
 
@@ -45,13 +46,13 @@ var (
 )
 
 type GaRuS struct {
-	mux sync.RWMutex
-	ts  *tokens.TokenStore
+	mux       sync.RWMutex
+	ts        *tokens.TokenStore
 	upServers []*UpServer
 }
 
 type UpServer struct {
-	mux sync.RWMutex
+	//mux    sync.RWMutex
 	TLS    bool
 	SrvTCP *HttpServer
 	SrvTLS *HttpsServer
@@ -72,19 +73,19 @@ type Server interface {
 // HttpServer struct for graceful start/stop
 type HttpServer struct {
 	httpServer *http.Server
-	srvstr     string // ip:port
-	wgsrv      sync.WaitGroup
-	stopChan   chan struct{}
+	//srvstr     string // ip:port
+	wgsrv    sync.WaitGroup
+	stopChan chan struct{}
 }
 
 // HttpsServer struct for graceful start/stop
 type HttpsServer struct {
 	httpServer *http.Server
-	srvstr     string // ip:port
-	tlscrt     string
-	tlskey     string
-	stopChan   chan struct{}
-	wgsrv      sync.WaitGroup
+	//srvstr     string // ip:port
+	tlscrt   string
+	tlskey   string
+	stopChan chan struct{}
+	wgsrv    sync.WaitGroup
 }
 
 // Start for HttpServer
@@ -98,12 +99,12 @@ func (s *HttpServer) Start() {
 		}
 		// releases when server stops listening
 		/*
-		select {
-			case s.stopChan <- struct{}{}:
-				fmt.Printf("TCP server: s.stopChan sent!")
-			default:
-				fmt.Printf("TCP server: s.stopChan is full, ignore!")
-		}
+			select {
+				case s.stopChan <- struct{}{}:
+					fmt.Printf("TCP server: s.stopChan sent!")
+				default:
+					fmt.Printf("TCP server: s.stopChan is full, ignore!")
+			}
 		*/
 	}()
 }
@@ -117,7 +118,6 @@ func (s *HttpServer) Stop(ctx context.Context) error {
 	return err
 }
 
-
 // Start for HttpsServer
 func (s *HttpsServer) Start() {
 	s.wgsrv.Add(1)
@@ -129,13 +129,13 @@ func (s *HttpsServer) Start() {
 		}
 		// releases when server stops listening
 		/*
-		fmt.Printf("TLS server: s.stopChan sending")
-		select {
-			case s.stopChan <- struct{}{}:
-				fmt.Printf("TLS server: s.stopChan sent!")
-			default:
-				fmt.Printf("TLS server: s.stopChan is full, ignore!")
-		}
+			fmt.Printf("TLS server: s.stopChan sending")
+			select {
+				case s.stopChan <- struct{}{}:
+					fmt.Printf("TLS server: s.stopChan sent!")
+				default:
+					fmt.Printf("TLS server: s.stopChan is full, ignore!")
+			}
 		*/
 	}()
 }
@@ -148,7 +148,6 @@ func (s *HttpsServer) Stop(ctx context.Context) error {
 	fmt.Printf("HttpsServer.Stop() quit: err='%v'\n", err)
 	return err
 }
-
 
 // Factory for HttpServer
 func NewHttpServer(addr string, handler http.Handler, stopChan chan struct{}) *HttpServer {
@@ -174,8 +173,8 @@ func NewHttpsServer(addr string, handler http.Handler, tlscrt, tlskey string, st
 			ReadTimeout:  time.Duration(HttpReadTimeout) * time.Second,
 			WriteTimeout: time.Duration(HttpSendTimeout) * time.Second,
 		},
-		tlscrt: tlscrt,
-		tlskey: tlskey,
+		tlscrt:   tlscrt,
+		tlskey:   tlskey,
 		stopChan: stopChan,
 	}
 }
@@ -185,11 +184,11 @@ func NewGaRuS(listenStr, routesStr, uploadStr, tokensStr, tlscrt, tlskey string,
 	// provide "g" if you already have create a GaRuS instance and want to boot another ip:port!
 
 	if tokensStr == "" || listenStr == "" || routesStr == "" || uploadStr == "" {
-		return nil, fmt.Errorf("ERROR in NewGarus_: missing inputs?! tokens='%s' listen='%s' route='%s' updir='%s'\n", tokensStr, listenStr, routesStr, uploadStr)
+		return nil, fmt.Errorf("error in NewGarus_: missing inputs?! tokens='%s' listen='%s' route='%s' updir='%s'", tokensStr, listenStr, routesStr, uploadStr)
 	}
 
 	if err := os.MkdirAll(uploadStr, 0755); err != nil {
-		return nil, fmt.Errorf("Failed to create upload dir: %v\n", err)
+		return nil, fmt.Errorf("failed to create upload dir: %v", err)
 	}
 
 	// Prepare token store and handler
@@ -251,7 +250,6 @@ func NewGaRuS(listenStr, routesStr, uploadStr, tokensStr, tlscrt, tlskey string,
 			thisUpServer.SrvTCP.Start()
 		}
 
-
 		// wait for signals to stop
 		<-thisUpServer.stopCh
 		thisUpServer.stopCh <- struct{}{} // re-fill to stop any others
@@ -275,96 +273,134 @@ func NewGaRuS(listenStr, routesStr, uploadStr, tokensStr, tlscrt, tlskey string,
 	return g, nil
 } // end func NewGaRuS
 
+func extractUploadHeaders(r *http.Request) (repo, gitref, gitsha7, compiler, token, host string, err error) {
+	host = networkacl.GetHost(r)
+	repo = r.Header.Get("X-Git-Repo")
+	gitref = r.Header.Get("X-Git-Ref")
+	gitsha7 = r.Header.Get("X-Git-SHA7")
+	compiler = r.Header.Get("X-Git-Comp")
+	token = r.Header.Get("X-Auth-Token")
+	if compiler == "" {
+		compiler = "undef"
+	}
+	switch {
+	case repo == "":
+		err = fmt.Errorf("missing repo")
+	case len(gitsha7) != 7:
+		err = fmt.Errorf("invalid gitsha7")
+	case token == "" || len(token) < tokens.MinTokenLen:
+		err = fmt.Errorf("invalid token")
+	case gitref == "" || len(gitref) == 0 || len(gitref) > 64:
+		err = fmt.Errorf("invalid gitref")
+	}
+	return
+}
+
+// Helper to authorize request
+func authorizeUpload(ts *tokens.TokenStore, repo, token string, r *http.Request) error {
+	auth := ts.Auth(repo, token, r, false)
+	if !auth.Valid {
+		return fmt.Errorf("unauthorized: %s", auth.Reason)
+	}
+	return nil
+}
+
+// Helper to save uploaded file
+func saveUploadedFile(updir, repo, gitref, gitsha7, ext, compiler, filename string, data io.Reader) (string, error) {
+	dstDir := filepath.Join(updir, repo, gitref, gitsha7, ext, compiler)
+	dstFile := filepath.Join(dstDir, filename)
+
+	if FileExists(dstFile) {
+		return "", fmt.Errorf("file already exists: %s", dstFile)
+	}
+
+	if !DirExists(dstDir) {
+		if err := os.MkdirAll(dstDir, 0755); err != nil {
+			return "", fmt.Errorf("failed to create dir: %w", err)
+		}
+	}
+
+	tmpfilename := fmt.Sprintf(".%s.t%d.r%d.tmp", filename, time.Now().Unix(), rand.Intn(999999))
+	dstTmp := filepath.Join(dstDir, tmpfilename)
+
+	file, err := os.OpenFile(dstTmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer file.Close()
+
+	bufWriter := bufio.NewWriterSize(file, DefaultBufferSize)
+	if _, err := io.Copy(bufWriter, data); err != nil {
+		return "", fmt.Errorf("failed to write file: %w", err)
+	}
+	if err := bufWriter.Flush(); err != nil {
+		return "", fmt.Errorf("failed to flush buffer: %w", err)
+	}
+
+	if err := os.Rename(dstTmp, dstFile); err != nil {
+		return "", fmt.Errorf("failed to move file: %w", err)
+	}
+
+	return dstFile, nil
+}
+
+// Helper to sanitize file extension and name
+func sanitizeFileInfo(filename string) (string, string) {
+	ext := filepath.Ext(filename)
+	if len(ext) > 1 && strings.HasPrefix(ext, ".") {
+		ext = ext[1:]
+	}
+	base := filepath.Base(filename)
+	return ext, base
+}
+
+// uploadHandler handles file uploads with necessary headers and authorization.
+// It checks for required headers, authorizes the upload, parses the multipart form,
 func uploadHandler(updir string, ts *tokens.TokenStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Only accept POST
 		if r.Method != http.MethodPost {
-			http.Error(w, "i", http.StatusMethodNotAllowed)
-			return
-		}
-		host := networkacl.GetHost(r)
-		repo := r.Header.Get("X-Git-Repo") // go-while/GaRuS
-		gitref := r.Header.Get("X-Git-Ref") // the branch
-		gitsha7 := r.Header.Get("X-Git-SHA7") // the shorted commit hash
-		compiler := r.Header.Get("X-Git-Comp") // info about who compiled it "SHR=self-hosted runner", "GOR=GoReleaser", ..."
-		token := r.Header.Get("X-Auth-Token")
-		if len(compiler) == 0 {
-			compiler = "undef"
-		}
-		if repo == "" || len(gitsha7) != 7 || token == "" || len(token) < tokens.MinTokenLen || gitref == "" || len(gitref) == 0 || len(gitref) > 64 {
-			fmt.Printf("Missing fields! repo='%s' token=%d gitref='%s' gitsha7='%s' compiler='%s' host='%s'\n", repo, len(token), gitref, gitsha7, compiler, host)
-			http.Error(w, "d", http.StatusUnauthorized)
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 
-		auth := ts.Auth(repo, token, r, false)
-		if !auth.Valid {
-			fmt.Printf("Invalid access! repo='%s' gitref='%s' reason='%s' host='%s'\n", repo, gitref, auth.Reason, host)
-			http.Error(w, "d", http.StatusUnauthorized)
-			return
-		}
-
-		// Parse multipart form
-		err := r.ParseMultipartForm(DefaultMemoryLimit)
+		repo, gitref, gitsha7, compiler, token, host, err := extractUploadHeaders(r)
 		if err != nil {
-			http.Error(w, "m", http.StatusBadRequest)
-			fmt.Printf("Could not parse multipart form: host='%s' err='%v'\n", host, err)
+			fmt.Printf("Header error: %v host='%s'\n", err, host)
+			http.Error(w, "Missing or invalid headers", http.StatusBadRequest)
 			return
 		}
 
-		// Get file from posted form-data
+		if err := authorizeUpload(ts, repo, token, r); err != nil {
+			fmt.Printf("Auth error: repo='%s' gitref='%s' host='%s' err='%v'\n", repo, gitref, host, err)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		if err := r.ParseMultipartForm(DefaultMemoryLimit); err != nil {
+			fmt.Printf("Multipart error: host='%s' err='%v'\n", host, err)
+			http.Error(w, "Malformed multipart form", http.StatusBadRequest)
+			return
+		}
+
 		data, handler, err := r.FormFile("file")
 		if err != nil {
 			fmt.Printf("No file uploaded: host='%s' err='%v'\n", host, err)
-			http.Error(w, "e", http.StatusBadRequest)
+			http.Error(w, "No file uploaded", http.StatusBadRequest)
 			return
 		}
 		defer data.Close()
 
-		ext := filepath.Ext(handler.Filename)
-		if len(ext) > 1 && strings.HasPrefix(ext, ".") {
-			ext = ext[1:]
-		}
-		filename := filepath.Base(handler.Filename)
-		dstDir := filepath.Join(updir, repo, gitref, gitsha7, ext, compiler)
-		dstFile := filepath.Join(dstDir, filename)
+		ext, filename := sanitizeFileInfo(handler.Filename)
 
-		if FileExists(dstFile) {
-			fmt.Printf("Repo: '%s' | upload denied! exists='%s' host='%s'\n", repo, dstFile, host)
-			http.Error(w, "#", http.StatusFound)
-			return
-		}
-
-		if !DirExists(dstDir) {
-			if err := os.MkdirAll(dstDir, 0755); err != nil {
-				fmt.Print(err)
-				http.Error(w, "!", http.StatusInternalServerError)
-				return
-			}
-		}
-		tmpfilename := fmt.Sprintf(".%s.t%d.r%d.tmp", filename, time.Now().Unix(), rand.Intn(999999))
-		dstTmp := filepath.Join(dstDir, tmpfilename)
-
-		file, err := os.OpenFile(dstTmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		dstFile, err := saveUploadedFile(updir, repo, gitref, gitsha7, ext, compiler, filename, data)
 		if err != nil {
-			fmt.Print(err)
-			http.Error(w, "p", http.StatusInternalServerError)
-			return
-		}
-
-		bufWriter := bufio.NewWriterSize(file, DefaultBufferSize)
-
-		if _, err := io.Copy(bufWriter, data); err != nil {
-			fmt.Print(err)
-			http.Error(w, "s", http.StatusInternalServerError)
-			return
-		}
-		bufWriter.Flush()
-		file.Close()
-
-		if err := os.Rename(dstTmp, dstFile); err != nil {
-			fmt.Print(err)
-			http.Error(w, "x", http.StatusInternalServerError)
+			if strings.Contains(err.Error(), "file already exists") {
+				fmt.Printf("Repo: '%s' | upload denied! exists='%s' host='%s'\n", repo, dstFile, host)
+				http.Error(w, "File already exists", http.StatusConflict)
+			} else {
+				fmt.Printf("Upload error: repo='%s' host='%s' err='%v'\n", repo, host, err)
+				http.Error(w, "Upload failed", http.StatusInternalServerError)
+			}
 			return
 		}
 
