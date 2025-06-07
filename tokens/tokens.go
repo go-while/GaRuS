@@ -97,7 +97,6 @@ func (ts *TokenStore) LoadTokens() error {
 	if ts.secure == nil {
 		ts.secure = make(map[string]Tokens)
 	}
-	//newTokens := make(map[string]Tokens)
 	for scanner.Scan() {
 		i++
 		line := strings.TrimSpace(scanner.Text())
@@ -167,10 +166,10 @@ func (ts *TokenStore) Auth(repo, token string, r *http.Request, test bool) AuthR
 } // end func Auth
 
 // AddToken adds (or updates a token) in the in-memory store for a given repo.
-func (ts *TokenStore) AddToken(repo string, token string, expires int64, network string) {
+func (ts *TokenStore) AddToken(repo string, token string, expires int64, network string) bool {
 	if expires < time.Now().Unix() {
 		fmt.Printf("WARN: tried to add an expired token='%s...' repo='%s'\n", token[:3], repo)
-		return
+		return false
 	}
 	ts.mux.Lock()
 	defer ts.mux.Unlock()
@@ -182,7 +181,7 @@ func (ts *TokenStore) AddToken(repo string, token string, expires int64, network
 	if !ok {
 		// repo not found
 		fmt.Printf("ERROR in AddToken: created repo but was not found?!\n")
-		return
+		return false
 	}
 	if _, exists := repoTokens[token]; exists {
 		// update expiry value if needed
@@ -200,7 +199,11 @@ func (ts *TokenStore) AddToken(repo string, token string, expires int64, network
 		}
 		fmt.Printf("Loaded Token: %s:xxx:%d netacl='%v' rem=(%d sec [%s])\n", repo, expires, ts.secure[repo][token].netacl, expires-time.Now().Unix(), FormatDurationHuman(expires-time.Now().Unix()))
 	}
-	return
+	if err := ts.saveTokens(); err != nil {
+		fmt.Printf("ERROR saving tokens err='%v'\n", err)
+		return false
+	}
+	return true
 } // end func ts.AddToken
 
 // RevokeToken removes a token from the in-memory store for a given repo.
@@ -218,6 +221,10 @@ func (ts *TokenStore) RevokeToken(repo, token string) bool {
 		// Optional: if no tokens remain for repo, remove repo entry
 		if len(repoTokens) == 0 {
 			delete(ts.secure, repo)
+		}
+		if err := ts.saveTokens(); err != nil {
+			fmt.Printf("ERROR saving tokens err='%v'\n", err)
+			return false
 		}
 		return true
 	}
@@ -243,3 +250,41 @@ func (ts *TokenStore) WatchTokenFile() {
 		ts.mux.Unlock()
 	}
 } // end func ts.WatchTokenFile
+
+// SaveTokens writes the current in-memory tokens to the passwd file in the correct format.
+// It overwrites the file with the current state of ts.secure.
+func (ts *TokenStore) saveTokens() error {
+
+	tmpFile := ts.passwd + ".tmp"
+	f, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open temp token file: %w", err)
+	}
+	defer f.Close()
+
+	writer := bufio.NewWriter(f)
+	for repo, repoTokens := range ts.secure {
+		for tokenStr, token := range repoTokens {
+			token.mux.RLock()
+			// Serialize netacl map to comma-separated string
+			var nets []string
+			for net := range token.netacl {
+				nets = append(nets, net)
+			}
+			network := strings.Join(nets, ",")
+			line := fmt.Sprintf("%s|%s|%d|%s\n", repo, tokenStr, token.expires, network)
+			token.mux.RUnlock()
+			if _, err := writer.WriteString(line); err != nil {
+				return fmt.Errorf("failed to write token line: %w", err)
+			}
+		}
+	}
+	if err := writer.Flush(); err != nil {
+		return fmt.Errorf("failed to flush token file: %w", err)
+	}
+	// Atomically replace the old file
+	if err := os.Rename(tmpFile, ts.passwd); err != nil {
+		return fmt.Errorf("failed to rename temp token file: %w", err)
+	}
+	return nil
+}
