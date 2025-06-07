@@ -9,13 +9,14 @@ package tokens
 
 import (
 	"bufio"
-	"github.com/go-while/GaRuS/networkacl"
 	"fmt"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/go-while/GaRuS/networkacl"
 )
 
 // passwd file format:
@@ -28,17 +29,18 @@ import (
 // regardless of any other networks set for this token!
 
 const (
-    MinTokenLen        = 20
-    SecondsPerMinute   = 60
-    SecondsPerHour     = 3600
-    SecondsPerDay      = 86400
+	MinTokenLen      = 20
+	MaxTokenLen      = 1024
+	SecondsPerMinute = 60
+	SecondsPerHour   = 3600
+	SecondsPerDay    = 86400
 )
 
 // Token represents a single authentication token.
 type Token struct {
-    mux     sync.RWMutex
-    netacl  map[string]struct{}
-    expires int64
+	mux     sync.RWMutex
+	netacl  map[string]struct{}
+	expires int64
 }
 
 // Tokens is a map of token strings to Token pointers.
@@ -46,19 +48,18 @@ type Tokens map[string]*Token // map[repo][authToken]Token{}
 
 // TokenStore provides thread-safe token management.
 type TokenStore struct {
-    mux    sync.RWMutex
-    secure map[string]Tokens
-    passwd string
-    hash   string
+	mux    sync.RWMutex
+	secure map[string]Tokens
+	passwd string
+	hash   string
 }
 
 // AuthResult represents the outcome of an Auth check.
 type AuthResult struct {
-    Valid   bool
-    Reason  string // "valid", "expired", "repo not found", etc.
-    Expires int64
+	Valid   bool
+	Reason  string // "valid", "expired", "repo not found", etc.
+	Expires int64
 }
-
 
 // NewTokenStore creates a new TokenStore and starts background reload.
 func NewTokenStore(filename string) *TokenStore {
@@ -195,7 +196,7 @@ func (ts *TokenStore) AddToken(repo string, token string, expires int64, network
 		// token does not exist: create new entry
 		ts.secure[repo][token] = &Token{
 			expires: expires,
-			netacl: networkacl.GetNetACLFunc(network),
+			netacl:  networkacl.GetNetACLFunc(network),
 		}
 		fmt.Printf("Loaded Token: %s:xxx:%d netacl='%v' rem=(%d sec [%s])\n", repo, expires, ts.secure[repo][token].netacl, expires-time.Now().Unix(), FormatDurationHuman(expires-time.Now().Unix()))
 	}
