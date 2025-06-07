@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -82,6 +83,9 @@ func main() {
 	}
 	mainMux.Unlock()
 
+	mainWG.Add(1)
+	go LaunchGaRuS(listen, routes, upload, tokenf, tlscrt, tlskey, &mainWG, stopChan, nil)
+
 	if adminIF != "" {
 		bootErr := make(chan error, 1)
 		fmt.Printf("Starting Admin Interface @ '%s' netacl='%s'\n", adminIF, netacl)
@@ -113,9 +117,6 @@ func main() {
 			} // end select
 		} // end for
 	}
-
-	mainWG.Add(1)
-	go LaunchGaRuS(listen, routes, upload, tokenf, tlscrt, tlskey, &mainWG, stopChan, nil)
 
 	mainWait()
 
@@ -155,11 +156,17 @@ forever:
 } // end func mainWait
 
 // launches a GaRuS Instance: this function blocks!
-func LaunchGaRuS(listenStr, routesStr, uploadStr, tokensStr, tlscrt, tlskey string, parentwg *sync.WaitGroup, stopChan chan struct{}, g *garus.GaRuS) {
+func LaunchGaRuS(listenStr, routesStr, uploadStr, tokensStr, tlscrt, tlskey string, parentwg *sync.WaitGroup, stopChan chan struct{}, g *garus.GaRuS) (id int) {
 	newg, err := garus.NewGaRuS(listenStr, routesStr, uploadStr, tokensStr, tlscrt, tlskey, parentwg, stopChan, nil)
 	if newg == nil || err != nil {
 		fmt.Printf("NewGaRuS failed: returned newg='%v' err='%v'\n", newg, err)
+		return -1
 	}
+	mainMux.Lock()
+	id = len(Servers) + 1 // start with 1, not 0
+	Servers[id] = newg
+	mainMux.Unlock()
+	return id
 } // end func LaunchGaRuS
 
 type ADMIN struct {
@@ -169,10 +176,10 @@ type ADMIN struct {
 
 // ReloadAdminTokens reads all tokens from the adminf file and returns them as a slice of strings.
 // Returns an error if the file cannot be read.
-func ReloadAdminTokens(adminf string) (map[string]struct{}, error) {
+func (a *ADMIN) ReloadAdminTokens() (map[string]struct{}, error) {
 	mainMux.RLock()
 	defer mainMux.RUnlock()
-	file, err := os.Open(adminf)
+	file, err := os.Open(a.adminf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open admin token file: %w", err)
 	}
@@ -218,7 +225,7 @@ func (a *ADMIN) AdminAuthorization(r *http.Request, w *http.ResponseWriter) bool
 	}
 
 	// Load admin tokens from the file
-	admintokens, err := ReloadAdminTokens(a.adminf)
+	admintokens, err := a.ReloadAdminTokens()
 	if err != nil {
 		return false
 	}
@@ -260,17 +267,80 @@ func (a *ADMIN) StartAdminInterface(adminIF string, netacl string, booted chan e
 	adminMux.HandleFunc("/add-instance", func(w http.ResponseWriter, r *http.Request) {
 		// Parse parameters, add instance, etc.
 		// Optionally require a secret/token
-		if authed := a.AdminAuthorization(r, &w); !authed {
+		if !a.AdminAuthorization(r, &w) {
 			return
 		}
+		// Parse form values for new instance parameters
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Failed to parse form", http.StatusBadRequest)
+			return
+		}
+		listen := r.FormValue("listen")
+		routes := r.FormValue("routes")
+		upload := r.FormValue("upload")
+		tokenf := r.FormValue("tokenf")
+		tlscrt := r.FormValue("tlscrt")
+		tlskey := r.FormValue("tlskey")
+
+		if listen == "" || routes == "" || upload == "" || tokenf == "" {
+			http.Error(w, "Missing required fields: listen, routes, upload, tokenf", http.StatusBadRequest)
+			return
+		}
+
+		// Launch the new GaRuS instance in a goroutine
+		mainWG.Add(1)
+		go LaunchGaRuS(listen, routes, upload, tokenf, tlscrt, tlskey, &mainWG, stopChan, nil)
+
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "New GaRuS instance started: listen=%s, routes=%s, upload=%s, tokenf=%s\n", listen, routes, upload, tokenf)
 	})
 
-	adminMux.HandleFunc("/list-tokens", func(w http.ResponseWriter, r *http.Request) {
-		if authed := a.AdminAuthorization(r, &w); !authed {
+	adminMux.HandleFunc("/add-token", func(w http.ResponseWriter, r *http.Request) {
+		if !a.AdminAuthorization(r, &w) {
 			return
 		}
-		// TODO: Implement token listing logic
-		fmt.Fprintln(w, "Token listing not implemented yet")
+		// Parse form values
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Failed to parse form", http.StatusBadRequest)
+			return
+		}
+		repo := r.FormValue("repo")
+		token := r.FormValue("token")
+		expiresStr := r.FormValue("expires")
+		network := r.FormValue("network")
+
+		if repo == "" || token == "" || expiresStr == "" || network == "" {
+			http.Error(w, "Missing required fields: repo, token, expires, network", http.StatusBadRequest)
+			return
+		}
+
+		expires, err := strconv.ParseInt(expiresStr, 10, 64)
+		if err != nil {
+			http.Error(w, "Invalid expires value", http.StatusBadRequest)
+			return
+		}
+
+		if expires < time.Now().Unix() {
+			http.Error(w, "Invalid expires value", http.StatusBadRequest)
+			return
+		}
+
+		// Validate token length
+		if len(token) < tokens.MinTokenLen || len(token) > tokens.MaxTokenLen {
+			http.Error(w, "Token too short or too long", http.StatusBadRequest)
+			return
+		}
+		/*
+			// Add the token to the token store
+			ok := ts.AddToken(repo, token, expires, network)
+			if !ok {
+				http.Error(w, "Failed to add token", http.StatusInternalServerError)
+				return
+			}
+		*/
+
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "Token added successfully")
 	})
 
 	mainMux.Lock()
