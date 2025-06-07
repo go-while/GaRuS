@@ -2,9 +2,9 @@ package networkacl
 
 import (
 	"fmt"
-	"strings"
-	"net/http"
 	"net"
+	"net/http"
+	"strings"
 	"sync"
 )
 
@@ -32,10 +32,10 @@ func GetNetACL(acl string) map[string]struct{} {
 // or make sure,that there are no other writers!
 func IsNetAllowed(host string, mux *sync.RWMutex, acl map[string]struct{}, test bool) bool {
 	/*
-	if test {
-		fmt.Printf("TEST IsNetAllowed returns true")
-		return true
-	}
+		if test {
+			fmt.Printf("TEST IsNetAllowed returns true")
+			return true
+		}
 	*/
 	if mux != nil {
 		mux.RLock()
@@ -47,10 +47,10 @@ func IsNetAllowed(host string, mux *sync.RWMutex, acl map[string]struct{}, test 
 		return true
 	}
 	/*
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr // fallback, may already be just host
-	}
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			host = r.RemoteAddr // fallback, may already be just host
+		}
 	*/
 
 	// check if remote Addr exists in map as key
@@ -59,7 +59,7 @@ func IsNetAllowed(host string, mux *sync.RWMutex, acl map[string]struct{}, test 
 		return allowed
 	}
 	// addr did not exist, check if there are subnets to check against
-	for ipnet, _ := range acl {
+	for ipnet := range acl {
 		if strings.Contains(ipnet, "/") {
 			allowed, err := MatchCIDR(host, ipnet)
 			if err != nil {
